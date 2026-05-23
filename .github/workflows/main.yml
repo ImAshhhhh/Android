@@ -1,10 +1,13 @@
-name: Android Emulator x86 Tests
+name: Android Emulator Screenshot Capture
 
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+
+permissions:
+  contents: write
 
 jobs:
   test:
@@ -28,7 +31,7 @@ jobs:
       - name: Create screenshots directory
         run: mkdir -p screenshots
 
-      - name: run tests and take screenshots
+      - name: Take screenshots
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: ${{ matrix.api-level }}
@@ -40,9 +43,7 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
           script: |
-            adb exec-out screencap -p > screenshots/before-tests-api${{ matrix.api-level }}-${{ matrix.target }}.png
-            ./gradlew connectedCheck || true
-            adb exec-out screencap -p > screenshots/after-tests-api${{ matrix.api-level }}-${{ matrix.target }}.png
+            adb exec-out screencap -p > screenshots/home-api${{ matrix.api-level }}-${{ matrix.target }}.png
 
       - name: Upload screenshots to repo
         if: always()
