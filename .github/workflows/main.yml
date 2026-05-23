@@ -6,9 +6,6 @@ on:
   pull_request:
     branches: [ main ]
 
-permissions:
-  contents: write
-
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -19,8 +16,6 @@ jobs:
     steps:
       - name: checkout
         uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Enable KVM
         run: |
@@ -45,17 +40,6 @@ jobs:
           script: |
             adb exec-out screencap -p > screenshots/home-api${{ matrix.api-level }}-${{ matrix.target }}.png
 
-      - name: Upload screenshots to repo
-        if: always()
-        run: |
-          if ls screenshots/*.png 1> /dev/null 2>&1; then
-            git config --global user.name "github-actions[bot]"
-            git config --global user.email "github-actions[bot]@users.noreply.github.com"
-            git add screenshots/*.png
-            git commit -m "Screenshots - API ${{ matrix.api-level }} ${{ matrix.target }} [skip ci]"
-            git push
-          fi
-
       - name: Upload screenshots as artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -63,3 +47,12 @@ jobs:
           name: screenshots-api${{ matrix.api-level }}-${{ matrix.target }}
           path: screenshots/
           retention-days: 7
+
+      - name: Display screenshot download link
+        if: always()
+        run: |
+          echo "============================================"
+          echo "📸 Screenshot Artifact Download Link:"
+          echo "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts"
+          echo "============================================"
+          echo "Artifact name: screenshots-api${{ matrix.api-level }}-${{ matrix.target }}"
