@@ -1,4 +1,4 @@
-name: Android Emulator (ARM64) CI
+name: Android Emulator ARM64 Tests
 
 on:
   push:
@@ -7,24 +7,58 @@ on:
     branches: [ main ]
 
 jobs:
-  android-tests:
-    runs-on: macos-latest  # This is an ARM64 (Apple Silicon) runner
+  test:
+    runs-on: ubuntu-24.04-arm
     strategy:
       matrix:
-        api-level: [30]  # ARM64 system images limited to fewer API levels
+        api-level: [30, 33, 34]
+        target: [google_apis]
     steps:
-      - name: Checkout code
+      - name: checkout
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Run instrumented tests on ARM64 emulator
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Create screenshots directory
+        run: mkdir -p screenshots
+
+      - name: run tests and take screenshots
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: ${{ matrix.api-level }}
+          target: ${{ matrix.target }}
           arch: arm64-v8a
-          target: default
-          profile: pixel_7_pro  # Modern ARM device profile
+          profile: pixel_7_pro
           cores: 4
           ram-size: 4096M
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
-          script: echo "Emulator is ready! Add your test commands here"
+          script: |
+            adb exec-out screencap -p > screenshots/before-tests-api${{ matrix.api-level }}-${{ matrix.target }}.png
+            ./gradlew connectedCheck || true
+            adb exec-out screencap -p > screenshots/after-tests-api${{ matrix.api-level }}-${{ matrix.target }}.png
+
+      - name: Upload screenshots to repo
+        if: always()
+        run: |
+          if ls screenshots/*.png 1> /dev/null 2>&1; then
+            git config --global user.name "github-actions[bot]"
+            git config --global user.email "github-actions[bot]@users.noreply.github.com"
+            git add screenshots/*.png
+            git commit -m "Screenshots - API ${{ matrix.api-level }} ${{ matrix.target }} [skip ci]"
+            git push
+          fi
+
+      - name: Upload screenshots as artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-api${{ matrix.api-level }}-${{ matrix.target }}
+          path: screenshots/
+          retention-days: 7
